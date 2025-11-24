@@ -1,0 +1,1615 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>极简音乐播放器</title>
+<link rel="stylesheet" href="/css/Tape_fe90.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #f5f5f5;
+            --secondary-color: #a29bfe;
+            --bg-dark: #0f0c29;
+            --bg-gradient: linear-gradient(to right, #24243e, #302b63, #0f0c29);
+            --card-bg: rgba(255, 255, 255, 0.1);
+            --text-color: #ffffff;
+            --text-secondary: #b3b3b3;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: var(--bg-gradient);
+            color: var(--text-color);
+            //min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* Header & Search */
+        header {
+            padding: 2rem;
+            text-align: center;
+            background: rgba(0, 0, 0, 0);
+            backdrop-filter: blur(10px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            font-weight: 300;
+            letter-spacing: 2px;
+            margin-bottom: 1.5rem;
+            font-size: 1.8rem;
+        }
+
+        .search-container {
+            max-width: 600px;
+            margin: 0 auto;
+            position: relative;
+            display: flex;
+            gap: 10px;
+        }
+
+        input[type="text"] {
+            width: 50vw;
+            padding: 12px 20px;
+            border-radius: 30px;
+            border: none;
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            font-size: 1rem;
+            outline: none;
+            transition: background 0.3s;
+        }
+
+        input[type="text"]:focus {
+            background: rgba(255, 255, 255, 0.25);
+            box-shadow: 0 0 15px rgba(108, 92, 231, 0.5);
+        }
+
+        button#search-btn {
+            padding: 0 25px;
+            border-radius: 30px;
+            border: none;
+            background: var(--primary-color);
+            color: lightgrey;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.2s, background 0.3s;
+        }
+
+        button#search-btn:hover {
+            background: var(--secondary-color);
+            transform: scale(1.05);
+        }
+
+        /* Main Content */
+        main {
+            flex: 1;
+            padding: 2rem;
+            width: 100%;
+            padding-bottom: 100px; /* Space for player */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .loading {
+            text-align: center;
+            margin-top: 50px;
+            display: none;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: var(--primary-color);
+            animation: spin 1s ease-in-out infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 2rem;
+        }
+
+        .song-card {
+            background: var(--card-bg);
+            border-radius: 15px;
+            padding: 15px;
+            transition: transform 0.3s, background 0.3s;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        .song-card:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .song-card img {
+            width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            aspect-ratio: 1/1;
+            object-fit: cover;
+        }
+
+        .song-info {
+            margin-top: 15px;
+            width: 100%;
+        }
+
+        .song-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 1rem;
+        }
+
+        .artist-name {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .play-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+            border-radius: 15px;
+        }
+
+        .song-card:hover .play-overlay {
+            opacity: 1;
+        }
+
+        .play-overlay i {
+            font-size: 3rem;
+            color: white;
+            filter: drop-shadow(0 0 10px rgba(0,0,0,0.5));
+        }
+
+        /* Player Bar */
+        .player-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: rgba(20, 20, 30, 0.95);
+            backdrop-filter: blur(15px);
+            padding: 15px 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            z-index: 200;
+            transform: translateY(100%);
+            transition: transform 0.4s ease-out;
+        }
+
+        .player-bar.active {
+            transform: translateY(0);
+        }
+
+        .player-info {
+            display: flex;
+            align-items: center;
+            width: 25%;
+        }
+
+        .player-info img {
+            width: 50px;
+            height: 50px;
+            border-radius: 5px;
+            margin-right: 15px;
+            animation: rotate 10s linear infinite;
+            animation-play-state: paused;
+        }
+        
+        .player-info img.playing {
+            animation-play-state: running;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .player-text {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .player-title {
+            font-weight: bold;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .player-artist {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .player-controls {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .ctrl-btn {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: color 0.2s;
+        }
+
+        .ctrl-btn:hover {
+            color: var(--primary-color);
+        }
+
+        .play-pause-btn {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: white;
+            color: black;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+        
+        .play-pause-btn:hover {
+            background: var(--secondary-color);
+            color: white;
+        }
+
+        /* Visualizer Bars */
+        .visualizer {
+            display: flex;
+            align-items: flex-end;
+            gap: 3px;
+            height: 20px;
+            margin-right: 20px;
+        }
+
+        /* Progress Bar & Time Display */
+        .progress-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            width: 40%;
+            max-width: 400px;
+        }
+
+        .time-display {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            min-width: 45px;
+            text-align: center;
+        }
+
+        .progress-bar {
+            flex: 1;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            position: relative;
+            cursor: pointer;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background: var(--primary-color);
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
+        .progress-bar:hover .progress-fill {
+            background: var(--secondary-color);
+        }
+
+        .progress-bar:hover {
+            height: 6px;
+        }
+
+        .bar {
+            width: 4px;
+            background: var(--primary-color);
+            animation: equalize 1s infinite;
+            animation-play-state: paused;
+        }
+
+        .bar:nth-child(1) { animation-duration: 0.8s; height: 10px; }
+        .bar:nth-child(2) { animation-duration: 0.6s; height: 15px; }
+        .bar:nth-child(3) { animation-duration: 0.9s; height: 8px; }
+        .bar:nth-child(4) { animation-duration: 0.7s; height: 12px; }
+
+        .visualizer.active .bar {
+            animation-play-state: running;
+        }
+
+        @keyframes equalize {
+            0% { height: 5px; }
+            50% { height: 20px; }
+            100% { height: 5px; }
+        }
+
+        /* Mobile Responsiveness */
+        @media (max-width: 768px) {
+            .results-grid {
+                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+                gap: 1rem;
+            }
+            
+            .player-bar {
+                padding: 10px 15px;
+                flex-direction: row;
+            }
+            
+            .visualizer {
+                display: none;
+            }
+
+            .player-info {
+                width: 60%;
+            }
+            
+            .song-title {
+                font-size: 0.9rem;
+            }
+        }
+ .rotate-animation {
+            animation: rotate 2s linear infinite;
+            animation-play-state: running;
+        }
+
+        .rotate-paused {
+            animation-play-state: paused;
+        }
+
+        @keyframes rotate {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .Music_Player_Layer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .apple-player {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(40px);
+            border-radius: 16px;
+            padding: 24px;
+            width: 280px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+        }
+
+        .progress-bar {
+            background: rgba(0, 0, 0, 0.16);
+            height: 3px;
+            border-radius: 1.5px;
+            overflow: hidden;
+            margin-bottom: 12px;
+        }
+
+        .progress {
+            background: #ffffff;
+            height: 100%;
+            width: 0%;
+            transition: width 0.1s linear;
+            border-radius: 1.5px;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+        }
+
+        .play-pause-btn {
+            background: rgba(255, 255, 255, 0.95);
+            border: none;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+        }
+
+        .play-pause-btn:hover {
+            background: rgba(255, 255, 255, 1);
+            transform: scale(1.08);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
+        }
+
+        .play-pause-btn:active {
+            transform: scale(0.96);
+        }
+
+        .play-pause-btn svg {
+            color: #000000;
+        }
+
+        .play-icon, .pause-icon {
+            transition: opacity 0.2s ease;
+        }
+
+        .tape-animation-paused {
+            animation-play-state: paused;
+        }
+
+        /* 进度条填充样式 */
+        .progress-fill {
+            background: #007AFF;
+            height: 100%;
+            width: 0%;
+            transition: width 0.1s linear;
+            border-radius: 1.5px;
+        }
+
+        /* 进度条滑块样式 */
+        .progress-thumb {
+            width: 12px;
+            height: 12px;
+            background: #007AFF;
+            border-radius: 50%;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .group:hover .progress-thumb {
+            opacity: 1;
+        }
+
+        /* 播放器按钮样式 */
+        .player-button {
+            background: transparent;
+            border: none;
+            color: #666;
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+
+        .player-button:hover {
+            color: #007AFF;
+        }
+
+        .player-container {
+            width: 80vw;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .player-controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(40px);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .progress-container {
+            flex-grow: 1;
+            position: relative;
+            margin: 0 10px;
+        }
+
+        .time-display {
+            font-size: 12px;
+            color: #ffffff;
+            min-width: 40px;
+            text-align: center;
+            line-height: 1;
+        }
+
+        /* 右侧滑出层样式 */
+        .side-panel {
+            position: fixed;
+            top: 0;
+            right: -24vw; /* 初始隐藏在右侧 */
+            width: 24vw;
+            height: 100vh;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border-left: 1px solid rgba(255, 255, 255, 0.2);
+            transition: right 0.3s ease;
+            overflow-y: auto;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .side-panel.active {
+            right: 0; /* 滑入显示 */
+        }
+
+        .side-panel img {
+            width: 22.588vw;
+            height: auto;
+            margin-bottom: 15px;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: transform 0.2s ease;
+        }
+
+        .side-panel img:hover {
+            transform: scale(1.05);
+        }
+
+        /* 右侧触发区域 */
+        .right-trigger {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 50px;
+            height: 100vh;
+            z-index: 999;
+            background: transparent;
+        }
+
+        /* 左侧播放列表滑出层样式 */
+        .left-panel {
+            position: fixed;
+            top: 0;
+            left: -24vw; /* 初始隐藏在左侧 */
+            width: 24vw;
+            height: 100vh;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid rgba(255, 255, 255, 0.2);
+            transition: left 0.3s ease;
+            overflow-y: auto;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .left-panel.active {
+            left: 0; /* 滑入显示 */
+        }
+
+        .playlist-title {
+            color: #FFFFFF;
+            font-size: 18px;
+            margin-bottom: 15px;
+            text-align: center;
+            border-bottom: 2px solid rgba(0, 0, 0, 0.5);
+            padding-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .playlist-content {
+            color: #F5F5F5;
+        }
+
+        .playlist-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 8px;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .playlist-item:hover {
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .playlist-item.current {
+            background: rgba(0, 122, 255, 0.5);
+        }
+
+        .playlist-item .song-name {
+            flex: 1;
+            font-size: 14px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #F5F5F5;
+        }
+
+        .playlist-item .remove-btn {
+            color: #ff6b6b;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 5px;
+            border-radius: 3px;
+            transition: background 0.2s ease;
+        }
+
+        .playlist-item .remove-btn:hover {
+            background: rgba(255, 107, 107, 0.2);
+        }
+
+        /* 左侧触发区域 */
+        .left-trigger {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 50px;
+            height: 100vh;
+            z-index: 999;
+            background: transparent;
+        }
+
+    </style>
+</head>
+<body>
+<main>
+    <!--header-->
+<!-- 音乐卡带开始 -->
+    <div class="Tape_Back_Layer">
+        <img src="/images/Tape_fe90_back.png" alt="磁带背景">
+        <div class="Left_Tape" id="leftTape">
+            <img src="/images/Tape_fe90.png" alt="左磁带">
+        </div>
+        <div class="Right_Tape" id="rightTape">
+            <img src="/images/Tape_fe90.png" alt="右磁带">
+        </div>
+        <div class="Left_Area" id="leftArea">
+            <div class="Tape_Mask" id="tapeMask"></div>
+        </div>
+        <div class="Right_Area" id="rightArea">
+            <div class="Tape_Mask" id="tapeMask"></div>
+        </div>
+        <div class="Left_Tape_Reel" id="leftTapeReel">
+            <img src="/images/Tape_fe90_reel.png" alt="左磁带轮">
+        </div>
+        <div class="Right_Tape_Reel" id="rightTapeReel">
+            <img src="/images/Tape_fe90_reel.png" alt="右磁带轮">
+        </div>
+        <div class="Tape_Front_Layer">
+            <img src="images/Tape_fe90_front.png" alt="磁带前层">
+            <div class="Song_Title_Layer">下搜索右换带左列表</div>
+        </div>
+    </div><p><br></p>
+<!-- 音乐卡带结束 -->
+        <div class="search-container">
+            <input type="text" id="search-input" placeholder="搜索歌曲或歌手 (例如: 周杰伦, Taylor Swift)...">
+            <button id="search-btn"><i class="fas fa-search"></i></button>
+        </div>
+    <!-- 右侧触发区域 -->
+    <div class="right-trigger" id="rightTrigger"></div>
+
+    <!-- 右侧滑出层 -->
+    <div class="side-panel" id="sidePanel">
+        <img src="images/Tape_fe90_image.png" alt="Tape_fe90">
+        <img src="images/Tape_c90cr_image.png" alt="Tape_c90cr">
+        <img src="images/Tape_hrxs90_image.png" alt="Tape_hrxs90">
+        <img src="images/Tape_mgx100_image.png" alt="Tape_mgx100">
+        <img src="images/Tape_bhf90_image.png" alt="Tape_bhf90">
+        <img src="images/Tape_ocasse_image.png" alt="Tape_ocasse">
+        <img src="images/Tape_esii_image.png" alt="Tape_esii">
+        <img src="images/Tape_wu46_image.png" alt="Tape_wu46">
+        <img src="images/Tape_sa60_image.png" alt="Tape_sa60">
+        <img src="images/Tape_record54_image.png" alt="Tape_record54">
+    </div>
+
+    <!-- 左侧播放列表滑出层 -->
+    <div class="left-panel" id="leftPanel">
+<img src="images/head.png" alt="头部图片" style="width: 40vw; height:auto; margin-bottom: 15px; border-radius: 8px;">
+        <h3 class="playlist-title">播放列表</h3>
+        <div id="playlistContent" class="playlist-content"></div>
+    </div>
+
+    <!-- 左侧触发区域 -->
+    <div class="left-trigger" id="leftTrigger"></div>
+
+    <!--/header-->
+
+    <!--main-->
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p style="margin-top: 10px; color: var(--text-secondary);">阿泡正在努力搜索...</p>
+        </div><p><br></p>
+        <div id="results" class="results-grid">
+            <!-- 搜索结果将在这里生成 -->
+            <div style="grid-column: 1/-1; text-align: center; color: var(--text-secondary); margin-top: 50px;">
+                <i class="fas fa-headphones" style="font-size: 3rem; margin-bottom: 20px; opacity: 0.5;"></i>
+                <p>输入歌名开始探索阿泡的音乐世界</p>
+            </div>
+        </div>
+    </main>
+
+    <div class="player-bar" id="player-bar">
+        <div class="player-info">
+            <img src="" alt="Album Art" id="player-img">
+            <div class="player-text">
+                <span class="player-title" id="player-title">Song Title</span>
+                <span class="player-artist" id="player-artist">Artist</span>
+            </div>
+        </div>
+
+        <div class="visualizer" id="visualizer">
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+        </div>
+
+        <div class="progress-container">
+            <span class="time-display" id="current-time">0:00</span>
+            <div class="progress-bar" id="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <span class="time-display" id="duration">0:00</span>
+        </div>
+
+        <div class="player-controls">
+            <button class="ctrl-btn" id="prev-btn"><i class="fas fa-step-backward"></i></button>
+            <button class="ctrl-btn play-pause-btn" id="play-pause-btn"><i class="fas fa-play"></i></button>
+            <button class="ctrl-btn" id="next-btn"><i class="fas fa-step-forward"></i></button>
+        </div>
+        
+        <audio id="audio-player"></audio>
+    </div>
+
+    <script>
+        const searchInput = document.getElementById('search-input');
+        const searchBtn = document.getElementById('search-btn');
+        const resultsContainer = document.getElementById('results');
+        const loading = document.getElementById('loading');
+        const audioPlayer = document.getElementById('audio-player');
+        const playerBar = document.getElementById('player-bar');
+        const playerImg = document.getElementById('player-img');
+        const playerTitle = document.getElementById('player-title');
+        const playerArtist = document.getElementById('player-artist');
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const visualizer = document.getElementById('visualizer');
+        const currentTimeDisplay = document.getElementById('current-time');
+        const durationDisplay = document.getElementById('duration');
+        const progressBar = document.getElementById('progress-bar');
+        const progressFill = document.getElementById('progress-fill');
+
+        let isPlaying = false;
+        let updateInterval;
+
+        // 获取卡带元素
+        const leftTapeReel = document.getElementById('leftTapeReel');
+        const rightTapeReel = document.getElementById('rightTapeReel');
+        const leftTape = document.getElementById('leftTape');
+        const rightTape = document.getElementById('rightTape');
+
+        // 格式化时间显示 (秒 -> 分:秒)
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+        }
+
+        // 更新进度条和时间显示
+        function updateProgress() {
+            if (audioPlayer.duration) {
+                const currentTime = audioPlayer.currentTime;
+                const duration = audioPlayer.duration;
+                const progressPercent = (currentTime / duration) * 100;
+                
+                progressFill.style.width = `${progressPercent}%`;
+                currentTimeDisplay.textContent = formatTime(currentTime);
+                durationDisplay.textContent = formatTime(duration);
+            }
+        }
+
+        // 进度条点击跳转
+        function seekToPosition(event) {
+            if (!audioPlayer.duration) return;
+            
+            const progressBarRect = progressBar.getBoundingClientRect();
+            const clickPosition = (event.clientX - progressBarRect.left) / progressBarRect.width;
+            const seekTime = clickPosition * audioPlayer.duration;
+            
+            audioPlayer.currentTime = seekTime;
+        }
+
+        // 网络状态检测
+        function checkNetworkStatus() {
+            return navigator.onLine;
+        }
+
+        // 搜索功能 - 手机端优化版
+        async function searchMusic() {
+            const query = searchInput.value.trim();
+            if (!query) return;
+
+            // 检查网络状态
+            if (!checkNetworkStatus()) {
+                showNetworkOfflineMessage();
+                return;
+            }
+
+            // UI 更新
+            resultsContainer.innerHTML = '';
+            loading.style.display = 'block';
+
+            try {
+                // 添加移动设备检测和特殊处理
+                if (isMobileDevice()) {
+                    console.log('检测到移动设备，使用移动优化搜索策略');
+                    // 为移动设备添加额外的超时处理
+                    const searchResults = await tryMultipleSearchMethodsWithTimeout(query);
+                    
+                    if (searchResults && searchResults.length > 0) {
+                        displayResults(searchResults);
+                        // 为移动设备显示使用提示
+                        showMobileTips();
+                    } else {
+                        showNoResultsMessage(query);
+                    }
+                } else {
+                    // PC端使用标准搜索
+                    const searchResults = await tryMultipleSearchMethods(query);
+                    
+                    if (searchResults && searchResults.length > 0) {
+                        displayResults(searchResults);
+                    } else {
+                        showNoResultsMessage(query);
+                    }
+                }
+            } catch (error) {
+                console.error('所有搜索方法都失败:', error);
+                // 显示详细的错误信息和解决方案
+                showSearchError('搜索服务暂时不可用', '请检查网络连接或稍后重试');
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        // 尝试多种搜索方法 - 移动设备优化版
+        async function tryMultipleSearchMethods(query) {
+            const searchMethods = [
+                // 方法1: 使用最可靠的CORS代理 (移动设备首选)
+                async () => {
+                    const proxyUrl = 'https://api.allorigins.win/raw?url=';
+                    const targetUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=15`;
+                    
+                    const response = await fetch(proxyUrl + encodeURIComponent(targetUrl), {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        },
+                        mode: 'cors',
+                        signal: AbortSignal.timeout(8000) // 8秒超时
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        return data.results || [];
+                    }
+                    throw new Error('方法1失败');
+                },
+                
+                // 方法2: 使用备用CORS代理 (移动设备优化)
+                async () => {
+                    const proxyUrl = 'https://corsproxy.io/?';
+                    const targetUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=15`;
+                    
+                    const response = await fetch(proxyUrl + encodeURIComponent(targetUrl), {
+                        signal: AbortSignal.timeout(8000)
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        return data.results || [];
+                    }
+                    throw new Error('方法2失败');
+                },
+                
+                // 方法3: 使用新的CORS代理 (移动设备备用)
+                async () => {
+                    const proxyUrl = 'https://cors-anywhere.azm.workers.dev/?';
+                    const targetUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=15`;
+                    
+                    const response = await fetch(proxyUrl + encodeURIComponent(targetUrl), {
+                        signal: AbortSignal.timeout(8000)
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        return data.results || [];
+                    }
+                    throw new Error('方法3失败');
+                },
+                
+                // 方法4: 使用JSONP方式 (移动设备兼容性更好)
+                async () => {
+                    return new Promise((resolve, reject) => {
+                        const script = document.createElement('script');
+                        const callbackName = 'jsonpCallback_' + Date.now();
+                        
+                        window[callbackName] = function(data) {
+                            document.head.removeChild(script);
+                            delete window[callbackName];
+                            resolve(data.results || []);
+                        };
+                        
+                        script.src = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=15&callback=${callbackName}`;
+                        script.onerror = () => {
+                            document.head.removeChild(script);
+                            delete window[callbackName];
+                            reject(new Error('JSONP方法失败'));
+                        };
+                        
+                        document.head.appendChild(script);
+                        
+                        // 设置超时
+                        setTimeout(() => {
+                            if (document.head.contains(script)) {
+                                document.head.removeChild(script);
+                                delete window[callbackName];
+                                reject(new Error('JSONP超时'));
+                            }
+                        }, 8000);
+                    });
+                },
+                
+                // 方法5: 使用本地代理服务器 (如果存在)
+                async () => {
+                    try {
+                        const response = await fetch(`./proxy.php?query=${encodeURIComponent(query)}`, {
+                            signal: AbortSignal.timeout(8000)
+                        });
+                        if (response.ok) {
+                            const data = await response.json();
+                            return data.results || [];
+                        }
+                        throw new Error('本地代理失败');
+                    } catch (error) {
+                        throw new Error('本地代理不可用');
+                    }
+                }
+            ];
+
+            // 按顺序尝试所有方法，直到有一个成功
+            for (let i = 0; i < searchMethods.length; i++) {
+                try {
+                    console.log(`尝试搜索方法 ${i + 1}...`);
+                    const results = await searchMethods[i]();
+                    if (results && results.length > 0) {
+                        console.log(`方法 ${i + 1} 成功，找到 ${results.length} 个结果`);
+                        return results;
+                    }
+                } catch (error) {
+                    console.log(`方法 ${i + 1} 失败:`, error.message);
+                    // 继续尝试下一个方法
+                }
+            }
+            
+            // 如果所有方法都失败，返回空数组
+            return [];
+        }
+
+        // 带超时处理的搜索方法（专门为移动设备优化）
+        async function tryMultipleSearchMethodsWithTimeout(query) {
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('搜索超时')), 10000); // 10秒超时
+            });
+
+            try {
+                const searchPromise = tryMultipleSearchMethods(query);
+                const results = await Promise.race([searchPromise, timeoutPromise]);
+                return results;
+            } catch (error) {
+                console.log('搜索超时或失败:', error.message);
+                
+                // 超时后尝试更简单的搜索方法
+                return await trySimpleSearchMethods(query);
+            }
+        }
+
+        // 简化搜索方法（针对移动设备网络环境优化）
+        async function trySimpleSearchMethods(query) {
+            const simpleMethods = [
+                // 方法1: 使用最可靠的代理
+                async () => {
+                    const proxyUrl = 'https://api.allorigins.win/raw?url=';
+                    const targetUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=10`; // 减少结果数量
+                    
+                    const response = await fetch(proxyUrl + encodeURIComponent(targetUrl), {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        },
+                        mode: 'cors'
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        return data.results || [];
+                    }
+                    throw new Error('简化方法1失败');
+                },
+                
+                // 方法2: 使用备用代理，减少数据量
+                async () => {
+                    const proxyUrl = 'https://corsproxy.io/?';
+                    const targetUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=10`;
+                    
+                    const response = await fetch(proxyUrl + encodeURIComponent(targetUrl));
+                    if (response.ok) {
+                        const data = await response.json();
+                        return data.results || [];
+                    }
+                    throw new Error('简化方法2失败');
+                }
+            ];
+
+            // 按顺序尝试简化方法
+            for (let i = 0; i < simpleMethods.length; i++) {
+                try {
+                    console.log(`尝试简化搜索方法 ${i + 1}...`);
+                    const results = await simpleMethods[i]();
+                    if (results && results.length > 0) {
+                        console.log(`简化方法 ${i + 1} 成功，找到 ${results.length} 个结果`);
+                        return results;
+                    }
+                } catch (error) {
+                    console.log(`简化方法 ${i + 1} 失败:`, error.message);
+                }
+            }
+            
+            return [];
+        }
+
+        // 显示网络离线消息
+        function showNetworkOfflineMessage() {
+            resultsContainer.innerHTML = `
+                <div style="grid-column: 1/-1; text-align: center; padding: 2rem;">
+                    <i class="fas fa-wifi" style="font-size: 3rem; margin-bottom: 20px; color: #ff6b6b;"></i>
+                    <h3 style="color: var(--text-color); margin-bottom: 10px;">网络连接已断开</h3>
+                    <p style="color: var(--text-secondary); margin-bottom: 20px;">请检查您的网络连接后重试</p>
+                    
+                    <div style="background: rgba(255, 107, 107, 0.1); padding: 20px; border-radius: 10px; margin-top: 20px;">
+                        <h4 style="color: #ff6b6b; margin-bottom: 15px;">
+                            <i class="fas fa-mobile-alt"></i> 手机端网络解决方案
+                        </h4>
+                        <ul style="color: var(--text-secondary); font-size: 0.9rem; margin: 0; padding-left: 20px;">
+                            <li>检查WiFi连接是否正常</li>
+                            <li>尝试切换到移动数据网络</li>
+                            <li>重启手机网络设置</li>
+                            <li>检查飞行模式是否关闭</li>
+                        </ul>
+                    </div>
+                    
+                    <div style="margin-top: 30px;">
+                        <button onclick="retrySearch()" style="background: var(--primary-color); color: white; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer;">
+                            <i class="fas fa-redo"></i> 重新尝试搜索
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 备用搜索方案 - 使用本地音乐库或模拟数据
+        async function tryAlternativeSearch(query) {
+            try {
+                // 尝试使用代理服务器绕过CORS限制
+                const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
+                const targetUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=20`;
+                
+                const response = await fetch(proxyUrl + targetUrl, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.results && data.results.length > 0) {
+                        displayResults(data.results);
+                        return;
+                    }
+                }
+            } catch (proxyError) {
+                console.log('代理搜索失败:', proxyError);
+            }
+            
+            // 如果代理也失败，显示离线搜索建议
+            showOfflineSearchSuggestions(query);
+        }
+
+        // 显示离线搜索建议
+        function showOfflineSearchSuggestions(query) {
+            resultsContainer.innerHTML = `
+                <div style="grid-column: 1/-1; text-align: center; padding: 2rem;">
+                    <i class="fas fa-wifi-slash" style="font-size: 3rem; margin-bottom: 20px; color: #ff6b6b;"></i>
+                    <h3 style="color: var(--text-color); margin-bottom: 10px;">网络连接问题</h3>
+                    <p style="color: var(--text-secondary); margin-bottom: 20px;">无法连接到搜索服务，请检查网络设置</p>
+                    
+                    <div style="background: rgba(108, 92, 231, 0.1); padding: 20px; border-radius: 10px; margin-top: 20px; text-align: left;">
+                        <h4 style="color: var(--primary-color); margin-bottom: 15px;">
+                            <i class="fas fa-mobile-alt"></i> 手机端解决方案
+                        </h4>
+                        <ul style="color: var(--text-secondary); font-size: 0.9rem; margin: 0; padding-left: 20px;">
+                            <li>确保已连接到稳定的WiFi网络</li>
+                            <li>关闭VPN或代理软件后重试</li>
+                            <li>尝试切换到移动数据网络</li>
+                            <li>检查手机浏览器是否允许跨域请求</li>
+                            <li>某些地区可能无法访问iTunes搜索服务</li>
+                        </ul>
+                    </div>
+                    
+                    <div style="margin-top: 30px;">
+                        <button onclick="retrySearch()" style="background: var(--primary-color); color: white; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer; margin-right: 10px;">
+                            <i class="fas fa-redo"></i> 重新尝试搜索
+                        </button>
+                        <button onclick="showDemoSongs()" style="background: var(--secondary-color); color: white; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer;">
+                            <i class="fas fa-music"></i> 查看演示歌曲
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 重新搜索
+        function retrySearch() {
+            const query = searchInput.value.trim();
+            if (query) {
+                searchMusic();
+            }
+        }
+
+        // 显示演示歌曲
+        function showDemoSongs() {
+            const demoData = [
+                {
+                    trackName: "示例歌曲 1",
+                    artistName: "示例歌手",
+                    artworkUrl100: "https://via.placeholder.com/100x100/6c5ce7/ffffff?text=Demo",
+                    previewUrl: "https://www.soundjay.com/button/button-1.mp3"
+                },
+                {
+                    trackName: "示例歌曲 2", 
+                    artistName: "示例歌手",
+                    artworkUrl100: "https://via.placeholder.com/100x100/a29bfe/ffffff?text=Demo",
+                    previewUrl: "https://www.soundjay.com/button/button-2.mp3"
+                }
+            ];
+            displayResults(demoData);
+        }
+
+        // 检测是否为移动设备
+        function isMobileDevice() {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        }
+
+        // 显示搜索错误界面
+        function showSearchError(message, detail) {
+            resultsContainer.innerHTML = `
+                <div style="grid-column: 1/-1; text-align: center; padding: 2rem;">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 3rem; margin-bottom: 20px; color: #ff6b6b;"></i>
+                    <h3 style="color: var(--text-color); margin-bottom: 10px;">${message}</h3>
+                    <p style="color: var(--text-secondary); margin-bottom: 20px;">${detail}</p>
+                    <div style="background: rgba(255,107,107,0.1); padding: 15px; border-radius: 10px; margin-top: 20px;">
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">
+                            <i class="fas fa-info-circle"></i> 移动设备提示：请确保使用稳定的WiFi网络，或尝试关闭VPN后重试
+                        </p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 显示无结果消息
+        function showNoResultsMessage(query) {
+            resultsContainer.innerHTML = `
+                <div style="grid-column: 1/-1; text-align: center; padding: 2rem;">
+                    <i class="fas fa-search" style="font-size: 3rem; margin-bottom: 20px; opacity: 0.5;"></i>
+                    <h3 style="color: var(--text-color); margin-bottom: 10px;">未找到相关歌曲</h3>
+                    <p style="color: var(--text-secondary); margin-bottom: 10px;">搜索词："${query}"</p>
+                    <p style="font-size: 0.8rem; color: var(--text-secondary);">
+                        请尝试使用其他关键词，如歌手名或英文歌曲名
+                    </p>
+                </div>
+            `;
+        }
+
+        // 显示移动设备提示
+        function showMobileTips() {
+            const tipsContainer = document.createElement('div');
+            tipsContainer.style.cssText = 'grid-column: 1/-1; background: rgba(108, 92, 231, 0.1); padding: 15px; border-radius: 10px; margin-top: 20px;';
+            tipsContainer.innerHTML = `
+                <h4 style="color: var(--primary-color); margin-bottom: 10px;">
+                    <i class="fas fa-mobile-alt"></i> 移动设备使用提示
+                </h4>
+                <ul style="text-align: left; color: var(--text-secondary); font-size: 0.8rem; margin: 0; padding-left: 20px;">
+                    <li>确保使用稳定的WiFi网络连接</li>
+                    <li>关闭VPN或代理软件后重试</li>
+                    <li>尝试使用不同的网络运营商</li>
+                    <li>某些地区可能无法访问iTunes搜索服务</li>
+                </ul>
+            `;
+            resultsContainer.appendChild(tipsContainer);
+        }
+
+        // 渲染结果
+        function displayResults(songs) {
+            if (songs.length === 0) {
+                resultsContainer.innerHTML = '<p style="grid-column: 1/-1; text-align: center;">未找到相关歌曲。</p>';
+                return;
+            }
+
+            songs.forEach(song => {
+                // 获取更高分辨率的封面图 (API默认是100x100, 这里替换成600x600)
+                const artworkUrl = song.artworkUrl100.replace('100x100bb', '600x600bb');
+                
+                const card = document.createElement('div');
+                card.className = 'song-card';
+                card.innerHTML = `
+                    <div style="position: relative; width: 100%;">
+                        <img src="${artworkUrl}" alt="${song.trackName}">
+                        <div class="play-overlay">
+                            <i class="fas fa-play-circle"></i>
+                        </div>
+                    </div>
+                    <div class="song-info">
+                        <div class="song-title">${song.trackName}</div>
+                        <div class="artist-name">${song.artistName}</div>
+                    </div>
+                `;
+
+                // 点击播放
+                card.addEventListener('click', () => {
+                    playSong(song.previewUrl, song.trackName, song.artistName, artworkUrl);
+                });
+
+                resultsContainer.appendChild(card);
+            });
+        }
+
+        // 播放逻辑
+        function playSong(url, title, artist, artwork) {
+            // 更新播放器 UI
+            playerBar.classList.add('active');
+            playerTitle.textContent = title;
+            playerArtist.textContent = artist;
+            playerImg.src = artwork;
+
+            // 更新歌曲标题到卡带显示区域
+            const songTitleLayer = document.querySelector('.Song_Title_Layer');
+            if (songTitleLayer) {
+                songTitleLayer.textContent = title;
+            }
+
+            // 设置音频源并播放
+            audioPlayer.src = url;
+            audioPlayer.play();
+            
+            updatePlayState(true);
+            
+            // 开始更新进度条
+            startProgressUpdate();
+        }
+
+        // 开始更新进度条
+        function startProgressUpdate() {
+            // 清除之前的间隔
+            if (updateInterval) {
+                clearInterval(updateInterval);
+            }
+            
+            // 设置新的间隔来更新进度条
+            updateInterval = setInterval(updateProgress, 100);
+            
+            // 添加音频事件监听器
+            audioPlayer.addEventListener('timeupdate', updateProgress);
+            audioPlayer.addEventListener('loadedmetadata', updateProgress);
+        }
+
+        // 播放/暂停状态切换
+        function togglePlay() {
+            if (audioPlayer.paused) {
+                audioPlayer.play();
+                updatePlayState(true);
+            } else {
+                audioPlayer.pause();
+                updatePlayState(false);
+            }
+        }
+
+        function updatePlayState(playing) {
+            isPlaying = playing;
+            const icon = playPauseBtn.querySelector('i');
+            
+            if (playing) {
+                icon.classList.remove('fa-play');
+                icon.classList.add('fa-pause');
+                playerImg.classList.add('playing');
+                visualizer.classList.add('active');
+                
+                // 播放时：移除暂停类，添加动画类
+                if (leftTapeReel && rightTapeReel) {
+                    leftTapeReel.classList.remove('rotate-paused');
+                    rightTapeReel.classList.remove('rotate-paused');
+                    leftTapeReel.classList.add('rotate-animation');
+                    rightTapeReel.classList.add('rotate-animation');
+                }
+            } else {
+                icon.classList.remove('fa-pause');
+                icon.classList.add('fa-play');
+                playerImg.classList.remove('playing');
+                visualizer.classList.remove('active');
+                
+                // 暂停时：添加暂停类，移除动画类
+                if (leftTapeReel && rightTapeReel) {
+                    leftTapeReel.classList.add('rotate-paused');
+                    rightTapeReel.classList.add('rotate-paused');
+                    leftTapeReel.classList.remove('rotate-animation');
+                    rightTapeReel.classList.remove('rotate-animation');
+                }
+            }
+        }
+
+        // 事件监听
+        searchBtn.addEventListener('click', searchMusic);
+        
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') searchMusic();
+        });
+
+        playPauseBtn.addEventListener('click', togglePlay);
+
+        // 进度条点击事件
+        progressBar.addEventListener('click', seekToPosition);
+
+        // 歌曲结束后自动播放下一首
+        audioPlayer.addEventListener('ended', () => {
+            updatePlayState(false);
+            playNextSong();
+        });
+
+        // 播放下一首歌曲
+        function playNextSong() {
+            if (currentPlaylist.length > 0) {
+                currentIndex = (currentIndex + 1) % currentPlaylist.length;
+                const song = currentPlaylist[currentIndex];
+                playSong(song.previewUrl, song.trackName, song.artistName, song.artworkUrl100);
+                updatePlaylistDisplay();
+            }
+        }
+
+        // 播放上一首歌曲
+        function playPreviousSong() {
+            if (currentPlaylist.length > 0) {
+                currentIndex = (currentIndex - 1 + currentPlaylist.length) % currentPlaylist.length;
+                const song = currentPlaylist[currentIndex];
+                playSong(song.previewUrl, song.trackName, song.artistName, song.artworkUrl100);
+                updatePlaylistDisplay();
+            }
+        }
+
+        // 简单的上一首/下一首占位符 (实际逻辑需要维护播放列表数组)
+        document.getElementById('prev-btn').addEventListener('click', () => {
+            alert('这是一个演示页面，上一首功能需要维护完整播放列表逻辑。');
+        });
+        document.getElementById('next-btn').addEventListener('click', () => {
+            alert('这是一个演示页面，下一首功能需要维护完整播放列表逻辑。');
+        });
+
+        // 右侧滑出层交互逻辑
+        const rightTrigger = document.getElementById('rightTrigger');
+        const sidePanel = document.getElementById('sidePanel');
+        const leftTrigger = document.getElementById('leftTrigger');
+        const leftPanel = document.getElementById('leftPanel');
+
+        // 右侧滑出层控制 - 鼠标悬停触发
+        rightTrigger.addEventListener('mouseenter', () => {
+            sidePanel.classList.add('active');
+        });
+
+        sidePanel.addEventListener('mouseenter', () => {
+            sidePanel.classList.add('active');
+        });
+
+        sidePanel.addEventListener('mouseleave', () => {
+            sidePanel.classList.remove('active');
+        });
+
+        // 左侧播放列表滑出层控制 - 鼠标悬停触发
+        leftTrigger.addEventListener('mouseenter', () => {
+            leftPanel.classList.add('active');
+        });
+
+        leftPanel.addEventListener('mouseenter', () => {
+            leftPanel.classList.add('active');
+        });
+
+        leftPanel.addEventListener('mouseleave', () => {
+            leftPanel.classList.remove('active');
+        });
+
+        // 卡带样式切换功能
+        function switchTape(tapeType) {
+            // 更新CSS样式表链接
+            const currentCssLink = document.querySelector('link[href*="Tape_"]');
+            if (currentCssLink) {
+                currentCssLink.href = `/css/Tape_${tapeType}.css`;
+            }
+
+            // 更新卡带图片
+            const leftTapeImg = document.querySelector('#leftTape img');
+            const rightTapeImg = document.querySelector('#rightTape img');
+            const leftTapeReelImg = document.querySelector('#leftTapeReel img');
+            const rightTapeReelImg = document.querySelector('#rightTapeReel img');
+            const tapeBackImg = document.querySelector('.Tape_Back_Layer img:first-child');
+            const tapeFrontImg = document.querySelector('.Tape_Front_Layer img');
+
+            if (leftTapeImg) leftTapeImg.src = `/images/Tape_${tapeType}.png`;
+            if (rightTapeImg) rightTapeImg.src = `/images/Tape_${tapeType}.png`;
+            if (leftTapeReelImg) leftTapeReelImg.src = `/images/Tape_${tapeType}_reel.png`;
+            if (rightTapeReelImg) rightTapeReelImg.src = `/images/Tape_${tapeType}_reel.png`;
+            if (tapeBackImg) tapeBackImg.src = `/images/Tape_${tapeType}_back.png`;
+            if (tapeFrontImg) tapeFrontImg.src = `/images/Tape_${tapeType}_front.png`;
+
+            console.log(`切换到 ${tapeType} 卡带样式`);
+        }
+
+        // 为侧边栏图片添加点击事件
+        const sidePanelImages = document.querySelectorAll('.side-panel img');
+        sidePanelImages.forEach(img => {
+            img.addEventListener('click', () => {
+                const altText = img.alt;
+                const tapeType = altText.replace('Tape_', '').replace('_image', '');
+                switchTape(tapeType);
+            });
+        });
+
+        // 播放列表功能
+        let currentPlaylist = [];
+        let currentIndex = -1;
+
+        // 添加歌曲到播放列表
+        function addToPlaylist(song) {
+            currentPlaylist.push(song);
+            updatePlaylistDisplay();
+        }
+
+        // 从播放列表移除歌曲
+        function removeFromPlaylist(index) {
+            currentPlaylist.splice(index, 1);
+            updatePlaylistDisplay();
+        }
+
+        // 更新播放列表显示
+        function updatePlaylistDisplay() {
+            const playlistContent = document.getElementById('playlistContent');
+            playlistContent.innerHTML = '';
+
+            currentPlaylist.forEach((song, index) => {
+                const playlistItem = document.createElement('div');
+                playlistItem.className = 'playlist-item';
+                if (index === currentIndex) {
+                    playlistItem.classList.add('current');
+                }
+
+                playlistItem.innerHTML = `
+                    <span class="song-name">${song.trackName} - ${song.artistName}</span>
+                    <button class="remove-btn" onclick="removeFromPlaylist(${index})">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+
+                playlistItem.addEventListener('click', () => {
+                    playFromPlaylist(index);
+                });
+
+                playlistContent.appendChild(playlistItem);
+            });
+
+            // 如果没有歌曲，显示提示
+            if (currentPlaylist.length === 0) {
+                playlistContent.innerHTML = '<p style="color: #F5F5F5; text-align: center; padding: 20px;">播放列表为空</p>';
+            }
+        }
+
+        // 从播放列表播放歌曲
+        function playFromPlaylist(index) {
+            if (index >= 0 && index < currentPlaylist.length) {
+                const song = currentPlaylist[index];
+                currentIndex = index;
+                playSong(song.previewUrl, song.trackName, song.artistName, song.artworkUrl100);
+                updatePlaylistDisplay();
+            }
+        }
+
+        // 修改播放函数，自动添加到播放列表
+        const originalPlaySong = playSong;
+        playSong = function(url, title, artist, artwork) {
+            // 检查是否已经在播放列表中
+            const existingIndex = currentPlaylist.findIndex(song => 
+                song.trackName === title && song.artistName === artist
+            );
+
+            if (existingIndex === -1) {
+                // 不在播放列表中，添加
+                addToPlaylist({
+                    trackName: title,
+                    artistName: artist,
+                    previewUrl: url,
+                    artworkUrl100: artwork
+                });
+                currentIndex = currentPlaylist.length - 1;
+            } else {
+                currentIndex = existingIndex;
+            }
+
+            // 调用原始播放函数
+            originalPlaySong(url, title, artist, artwork);
+            updatePlaylistDisplay();
+        };
+
+        // 初始化播放列表显示
+        updatePlaylistDisplay();
+
+    </script>
+</body>
+</html>
