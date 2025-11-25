@@ -3,9 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>极简音乐播放器</title>
+    <link rel="icon" href="/tape.svg" type="image/svg+xml">
+    <title>阿泡的怀旧磁带播放器</title>
 <link rel="stylesheet" href="/css/Tape_fe90.css">
     <script src="https://cdn.tailwindcss.com"></script>
+<!--script src="https://cdn.rawgit.com/ustbhuangyi/opencc/master/dist/opencc.js"></script-->
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -489,7 +491,11 @@
         }
 
         .play-pause-btn svg {
-            color: #000000;
+            color: #000000 !important;
+        }
+
+        .play-pause-btn i {
+            color: #000000 !important;
         }
 
         .play-icon, .pause-icon {
@@ -702,6 +708,68 @@
             z-index: 999;
             background: transparent;
         }
+.Tape_Mask {
+    position: absolute;
+    left: calc(11.2vw * var(--scale-factor, 1));
+    top: calc(11.2vw * var(--scale-factor, 1));
+    width: calc(12.7vw * var(--scale-factor, 1));
+    height: calc(12.7vw * var(--scale-factor, 1));
+    border-radius: 50%;
+    background-color: #36325f;
+    pointer-events: none;
+    transform-origin: center;
+}
+
+/* 左磁带缩小动画 - 保持与Left_Tape_Reel相同的圆心位置 */
+@keyframes leftTapeShrink {
+    from {
+        width: calc(36.35vw * var(--scale-factor, 1));
+        height: calc(36.35vw * var(--scale-factor, 1));
+        left: calc(8.2vw * var(--scale-factor, 1));
+        top: calc(8.5vw * var(--scale-factor, 1));
+    }
+    to {
+        width: calc(20.35vw * var(--scale-factor, 1));
+        height: calc(20.35vw * var(--scale-factor, 1));
+        left: calc(16.2vw * var(--scale-factor, 1));
+        top: calc(16.5vw * var(--scale-factor, 1));
+    }
+}
+
+/* 右磁带放大动画 - 保持与Right_Tape_Reel相同的圆心位置 */
+@keyframes rightTapeGrow {
+    from {
+        width: calc(20.35vw * var(--scale-factor, 1));
+        height: calc(20.35vw * var(--scale-factor, 1));
+        left: calc(53.3vw * var(--scale-factor, 1));
+        top: calc(16.5vw * var(--scale-factor, 1));
+    }
+    to {
+        width: calc(36.35vw * var(--scale-factor, 1));
+        height: calc(36.35vw * var(--scale-factor, 1));
+        left: calc(45.3vw * var(--scale-factor, 1));
+        top: calc(8.5vw * var(--scale-factor, 1));
+    }
+}
+
+/* 动画类 - 增加特异性确保覆盖原有样式 */
+.Left_Tape.left-tape-shrink {
+    animation: leftTapeShrink var(--animation-duration, 30s) linear forwards !important;
+    animation-play-state: running;
+}
+
+.Left_Tape.left-tape-shrink.tape-animation-paused {
+    animation-play-state: paused !important;
+}
+
+.Right_Tape.right-tape-grow {
+    animation: rightTapeGrow var(--animation-duration, 30s) linear forwards !important;
+    animation-play-state: running;
+}
+
+.Right_Tape.right-tape-grow.tape-animation-paused {
+    animation-play-state: paused !important;
+}
 
     </style>
 </head>
@@ -1335,10 +1403,10 @@
             playerImg.src = artwork;
 
             // 更新歌曲标题到卡带显示区域
-            const songTitleLayer = document.querySelector('.Song_Title_Layer');
-            if (songTitleLayer) {
-                songTitleLayer.textContent = title;
-            }
+const songTitleLayer = document.querySelector('.Song_Title_Layer');
+if (songTitleLayer) {
+songTitleLayer.textContent = title;
+}
 
             // 设置音频源并播放
             audioPlayer.src = url;
@@ -1376,6 +1444,74 @@
             }
         }
 
+        // 设置动画完成后的状态
+        function setupAnimationEndListeners() {
+            if (leftTape && rightTape) {
+                // 移除之前的事件监听器（避免重复添加）
+                leftTape.removeEventListener('animationend', handleLeftTapeAnimationEnd);
+                rightTape.removeEventListener('animationend', handleRightTapeAnimationEnd);
+                
+                // 添加新的动画结束事件监听器
+                leftTape.addEventListener('animationend', handleLeftTapeAnimationEnd);
+                rightTape.addEventListener('animationend', handleRightTapeAnimationEnd);
+            }
+        }
+
+        // 处理左磁带动画结束
+        function handleLeftTapeAnimationEnd(event) {
+            if (event.animationName === 'leftTapeShrink') {
+                // 动画完成后，手动设置最终状态
+                leftTape.style.transform = 'scale(0.8)'; // 缩小的最终状态
+                console.log('左磁带缩小动画完成，设置最终状态');
+            }
+        }
+
+        // 处理右磁带动画结束
+        function handleRightTapeAnimationEnd(event) {
+            if (event.animationName === 'rightTapeGrow') {
+                // 动画完成后，手动设置最终状态
+                rightTape.style.transform = 'scale(1.2)'; // 放大的最终状态
+                console.log('右磁带放大动画完成，设置最终状态');
+            }
+        }
+
+        // 重置动画状态到初始值
+        function resetTapeAnimationState() {
+            if (leftTape) {
+                leftTape.style.transform = 'scale(1)'; // 初始状态
+            }
+            if (rightTape) {
+                rightTape.style.transform = 'scale(1)'; // 初始状态
+            }
+        }
+
+        // 重置磁带动画到初始状态
+        function resetTapeAnimation() {
+            if (leftTape && rightTape) {
+                // 移除所有动画类
+                leftTape.classList.remove('left-tape-shrink', 'tape-animation-paused');
+                rightTape.classList.remove('right-tape-grow', 'tape-animation-paused');
+                
+                // 强制重置CSS动画状态
+                void leftTape.offsetWidth; // 触发重排
+                void rightTape.offsetWidth; // 触发重排
+                
+                // 重置动画状态
+                leftTapeReel.classList.add('rotate-animation');
+                rightTapeReel.classList.add('rotate-animation');
+                
+                // 重置动画持续时间到默认值
+                leftTape.style.animationDuration = '30s';
+                rightTape.style.animationDuration = '30s';
+                
+                // 重置transform状态
+                leftTape.style.transform = '';
+                rightTape.style.transform = '';
+                
+                console.log('磁带动画已完全重置到初始状态');
+            }
+        }
+
         function updatePlayState(playing) {
             isPlaying = playing;
             const icon = playPauseBtn.querySelector('i');
@@ -1386,12 +1522,60 @@
                 playerImg.classList.add('playing');
                 visualizer.classList.add('active');
                 
-                // 播放时：移除暂停类，添加动画类
+                // 播放时：移除暂停类，确保动画类存在
                 if (leftTapeReel && rightTapeReel) {
                     leftTapeReel.classList.remove('rotate-paused');
                     rightTapeReel.classList.remove('rotate-paused');
                     leftTapeReel.classList.add('rotate-animation');
                     rightTapeReel.classList.add('rotate-animation');
+                }
+                
+                // 播放时：控制Left_Tape和Right_Tape的放大缩小动画
+                if (leftTape && rightTape) {
+                    // 如果是从暂停状态恢复，只需移除暂停类
+                    if (leftTape.classList.contains('tape-animation-paused')) {
+                        leftTape.classList.remove('tape-animation-paused');
+                        rightTape.classList.remove('tape-animation-paused');
+                        console.log('从暂停状态恢复动画');
+                    } else {
+                        // 如果是新播放或重新播放，完全重置动画
+                        // 强制重置动画状态
+                        resetTapeAnimation();
+                        
+                        // 等待歌曲元数据加载完成后再设置动画持续时间
+                        const setAnimationDuration = () => {
+                            const duration = audioPlayer.duration;
+                            if (duration && duration > 0) {
+                                // 使用歌曲时长的1倍作为动画持续时间
+                                const animationDuration = duration * 1;
+                                leftTape.style.animationDuration = `${animationDuration}s`;
+                                rightTape.style.animationDuration = `${animationDuration}s`;
+                                console.log(`设置动画持续时间: ${animationDuration}秒 (歌曲时长: ${duration}秒, 1倍)`);
+                            } else {
+                                // 如果duration为0，设置更长的默认持续时间
+                                leftTape.style.animationDuration = '30s'; // 默认30s
+                                rightTape.style.animationDuration = '30s'; // 默认30s
+                                console.log('使用默认动画持续时间: 30秒');
+                            }
+                            
+                            // 添加动画类：Left_Tape缩小，Right_Tape放大
+                            leftTape.classList.add('left-tape-shrink');
+                            rightTape.classList.add('right-tape-grow');
+                            console.log('添加动画类：Left_Tape缩小，Right_Tape放大');
+                        };
+                        
+                        // 如果duration已经可用，直接设置
+                        if (audioPlayer.duration && audioPlayer.duration > 0) {
+                            setAnimationDuration();
+                        } else {
+                            // 否则等待loadedmetadata事件
+                            const onLoadedMetadata = () => {
+                                setAnimationDuration();
+                                audioPlayer.removeEventListener('loadedmetadata', onLoadedMetadata);
+                            };
+                            audioPlayer.addEventListener('loadedmetadata', onLoadedMetadata);
+                        }
+                    }
                 }
             } else {
                 icon.classList.remove('fa-pause');
@@ -1399,12 +1583,18 @@
                 playerImg.classList.remove('playing');
                 visualizer.classList.remove('active');
                 
-                // 暂停时：添加暂停类，移除动画类
+                // 暂停时：添加暂停类，保持动画类
                 if (leftTapeReel && rightTapeReel) {
                     leftTapeReel.classList.add('rotate-paused');
                     rightTapeReel.classList.add('rotate-paused');
-                    leftTapeReel.classList.remove('rotate-animation');
-                    rightTapeReel.classList.remove('rotate-animation');
+                    // 保持rotate-animation类，只是暂停播放状态
+                }
+                
+                // 暂停时：暂停Left_Tape和Right_Tape的放大缩小动画
+                if (leftTape && rightTape) {
+                    leftTape.classList.add('tape-animation-paused');
+                    rightTape.classList.add('tape-animation-paused');
+                    console.log('暂停磁带动画');
                 }
             }
         }
@@ -1424,16 +1614,18 @@
         // 歌曲结束后自动播放下一首
         audioPlayer.addEventListener('ended', () => {
             updatePlayState(false);
-            playNextSong();
+            // 延迟一小段时间确保动画状态完全重置
+            setTimeout(() => {
+                playNextSong();
+            }, 100);
         });
 
         // 播放下一首歌曲
         function playNextSong() {
             if (currentPlaylist.length > 0) {
                 currentIndex = (currentIndex + 1) % currentPlaylist.length;
-                const song = currentPlaylist[currentIndex];
-                playSong(song.previewUrl, song.trackName, song.artistName, song.artworkUrl100);
-                updatePlaylistDisplay();
+                // 使用 playFromPlaylist 来确保动画正确重置
+                playFromPlaylist(currentIndex);
             }
         }
 
@@ -1576,7 +1768,71 @@
             if (index >= 0 && index < currentPlaylist.length) {
                 const song = currentPlaylist[index];
                 currentIndex = index;
-                playSong(song.previewUrl, song.trackName, song.artistName, song.artworkUrl100);
+                
+                // 更新播放器 UI
+                playerBar.classList.add('active');
+                playerTitle.textContent = song.trackName;
+                playerArtist.textContent = song.artistName;
+                playerImg.src = song.artworkUrl100;
+
+                // 更新歌曲标题到卡带显示区域
+                const songTitleLayer = document.querySelector('.Song_Title_Layer');
+                if (songTitleLayer) {
+                    songTitleLayer.textContent = song.trackName;
+                }
+
+                // 设置音频源
+                audioPlayer.src = song.previewUrl;
+                
+                // 使用与播放全新歌曲相同的动画逻辑
+                // 播放时：控制Left_Tape和Right_Tape的放大缩小动画
+                if (leftTape && rightTape) {
+                    // 如果是新播放，重新设置动画
+                    // 完全重置动画状态，与updatePlayState(true)中的逻辑保持一致
+                    resetTapeAnimation();
+                    
+                    // 等待歌曲元数据加载完成后再设置动画持续时间
+                    const setAnimationDuration = () => {
+                        const duration = audioPlayer.duration;
+                        if (duration && duration > 0) {
+                            // 使用歌曲时长的1倍作为动画持续时间
+                            const animationDuration = duration * 1;
+                            leftTape.style.animationDuration = `${animationDuration}s`;
+                            rightTape.style.animationDuration = `${animationDuration}s`;
+                            console.log(`播放列表切换：设置动画持续时间: ${animationDuration}秒 (歌曲时长: ${duration}秒, 1倍)`);
+                        } else {
+                            // 如果duration为0，设置更长的默认持续时间
+                            leftTape.style.animationDuration = '30s'; // 默认30s
+                            rightTape.style.animationDuration = '30s'; // 默认30s
+                            console.log('播放列表切换：使用默认动画持续时间: 30秒');
+                        }
+                        
+                        // 添加动画类：Left_Tape缩小，Right_Tape放大
+                        leftTape.classList.add('left-tape-shrink');
+                        rightTape.classList.add('right-tape-grow');
+                        console.log('播放列表切换：添加动画类：Left_Tape缩小，Right_Tape放大');
+                    };
+                    
+                    // 如果duration已经可用，直接设置
+                    if (audioPlayer.duration && audioPlayer.duration > 0) {
+                        setAnimationDuration();
+                    } else {
+                        // 否则等待loadedmetadata事件
+                        const onLoadedMetadata = () => {
+                            setAnimationDuration();
+                            audioPlayer.removeEventListener('loadedmetadata', onLoadedMetadata);
+                        };
+                        audioPlayer.addEventListener('loadedmetadata', onLoadedMetadata);
+                    }
+                }
+                
+                // 播放音频
+                audioPlayer.play();
+                updatePlayState(true);
+                
+                // 开始更新进度条
+                startProgressUpdate();
+                
                 updatePlaylistDisplay();
             }
         }
